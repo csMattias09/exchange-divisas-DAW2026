@@ -50,7 +50,8 @@ begin
   join tmp_tasas_demo t_o on t_o.codigo = o.codigoiso
   join tmp_tasas_demo t_d on t_d.codigo = d.codigoiso;
 
-  -- 2. Historial de precios (solo para pares que aún no tienen historial)
+  -- 2. Historial de precios (solo para pares sin historial en los últimos 90 días;
+  --    se conservan los registros antiguos que ya existían)
   insert into historicopreciospar
     (parmonedaid, mayorpreciocompra, menorprecioventa, volumencompra, volumenventa, fecharegistro, snapshotminuto)
   select pp.parmonedaid,
@@ -79,7 +80,10 @@ begin
                              interval '1 hour')
     ) s
   ) f
-  where not exists (select 1 from historicopreciospar h where h.parmonedaid = pp.parmonedaid);
+  where not exists (
+    select 1 from historicopreciospar h
+    where h.parmonedaid = pp.parmonedaid
+      and h.fecharegistro >= now() - interval '90 days');
 
   -- 3. Usuario creador de mercado (su contraseña es un hash aleatorio: nadie puede iniciar sesión con él)
   insert into usuarios (rolid, paisid, nombreusuario, correoelectronico, passwordhash,
