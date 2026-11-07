@@ -1,0 +1,23 @@
+# Levanta solo el backend. El frontend vive en su propio repositorio
+# (intercambio_Divisas_Front_Web) con su propio docker-compose.yml.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: xchang-backend:latest
+    container_name: xchang-backend
+    ports:
+      - "5198:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: ${SUPABASE_DB_CONNECTION}
+      Supabase__ProjectId: ${SUPABASE_PROJECT_ID}
+      Supabase__Url: ${SUPABASE_URL}
+      Supabase__AnonKey: ${SUPABASE_ANON_KEY}
+      Supabase__ServiceRoleKey: ${SUPABASE_SERVICE_ROLE_KEY}
+      BrevoSettings__ApiKey: ${BREVO_API_KEY}
+      BrevoSettings__CorreoRemitente: ${BREVO_SENDER_EMAIL}
+      Groq__ApiKey: ${GROQ_API_KEY}
+      FrontendSettings__BaseUrl: http://localhost:9200
+    restart: unless-stopped

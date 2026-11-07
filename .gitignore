@@ -21,3 +21,5 @@ _ReSharper*/
 appsettings.json
 appsettings.*.json
 !appsettings.example.json
+# Variables de entorno para Docker (usar .env.example como plantilla)
+.env
