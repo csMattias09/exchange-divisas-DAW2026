@@ -20,4 +20,4 @@ docker compose up --build
 - API: http://localhost:5198/api
 - Comprobacion rapida (consulta la base de datos): http://localhost:5198/api/moneda
 
-El documento de la entrega está en `Formato de Proyecto 2026-02.docx`.
+El documento de la entrega está en `Proyecto 2026-02 - GRUPO-1.docx`.
