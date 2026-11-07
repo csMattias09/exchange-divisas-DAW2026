@@ -91,21 +91,6 @@ if (app.Environment.IsDevelopment())
 app.UseCors("dev");
 app.UseHttpsRedirection();
 
-app.MapGet("/health", async (ExchangeDivisasDbContext db) =>
-{
-    try
-    {
-        var canConnect = await db.Database.CanConnectAsync();
-        return canConnect
-            ? Results.Ok(new { status = "ok", database = "connected" })
-            : Results.Json(new { status = "error", database = "disconnected" }, statusCode: 503);
-    }
-    catch (Exception ex)
-    {
-        return Results.Json(new { status = "error", database = "disconnected", detail = ex.Message }, statusCode: 503);
-    }
-});
-
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
