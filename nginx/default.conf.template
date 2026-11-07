@@ -1,0 +1,48 @@
+# Reverse proxy y balanceador de carga delante de las replicas del backend.
+# Las variables ${...} las reemplaza la imagen oficial de Nginx al arrancar (envsubst).
+
+# DNS interno de la plataforma: re-resuelve los nombres de las replicas cada 10 s,
+# asi Nginx sigue funcionando aunque una replica cambie de IP al redesplegarse.
+resolver ${DNS_RESOLVER} valid=10s ipv6=on;
+
+upstream backend_replicas {
+    zone backend_replicas 64k;
+    # Reparte cada peticion a la replica con menos conexiones activas
+    least_conn;
+    server ${BACKEND_1_HOST}:8080 resolve max_fails=3 fail_timeout=15s;
+    server ${BACKEND_2_HOST}:8080 resolve max_fails=3 fail_timeout=15s;
+}
+
+# Cada linea del log muestra a que replica fue la peticion ($upstream_addr)
+log_format replicas '$remote_addr "$request" $status -> $upstream_addr ($upstream_response_time s)';
+
+server {
+    listen ${PORT};
+    listen [::]:${PORT};
+    server_name _;
+
+    access_log /dev/stdout replicas;
+    client_max_body_size 10m;
+
+    location /api/ {
+        proxy_pass http://backend_replicas;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        # Si una replica no responde, la peticion se reintenta en la otra
+        proxy_next_upstream error timeout http_502 http_503;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+    }
+
+    location = /health {
+        proxy_pass http://backend_replicas/health;
+        access_log off;
+    }
+
+    location / {
+        return 404;
+    }
+}

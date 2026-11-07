@@ -15,10 +15,15 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Orígenes permitidos separados por coma (Cors__AllowedOrigins en producción).
+// Sin configuración solo se permite el frontend local de Quasar.
+var origenesPermitidos = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:9200")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("dev", policy =>
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(origenesPermitidos)
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
@@ -90,6 +95,12 @@ if (app.Environment.IsDevelopment())
 }
 app.UseCors("dev");
 app.UseHttpsRedirection();
+
+// Health check para Railway y el balanceo de Nginx; no expone detalles del error.
+app.MapGet("/health", async (ExchangeDivisasDbContext db) =>
+    await db.Database.CanConnectAsync()
+        ? Results.Ok(new { status = "ok" })
+        : Results.Json(new { status = "error" }, statusCode: StatusCodes.Status503ServiceUnavailable));
 
 app.UseAuthentication();
 app.UseAuthorization();
