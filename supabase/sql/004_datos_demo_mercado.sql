@@ -18,6 +18,7 @@ do $$
 begin
   drop table if exists pg_temp.tmp_tasas_demo;
   drop table if exists pg_temp.tmp_precio_par_demo;
+  drop table if exists pg_temp.tmp_libro_demo;
 
   create temp table tmp_tasas_demo (codigo text primary key, por_usd numeric);
   insert into tmp_tasas_demo (codigo, por_usd) values
@@ -118,44 +119,37 @@ begin
 
   -- 4. Libro de órdenes: compra 0,5 % bajo el precio medio y venta 0,5 % sobre él,
   --    por el equivalente a 1 000 USD de la moneda de destino, en los pares con USD.
-  insert into ordenescompra
-    (usuarioid, parmonedaid, cantidadoriginal, cantidadobtenida, cantidadpendiente,
-     preciounitario, totalcomprometido, totalejecutado, estado, fechacreacion, fechaactualizacion)
+  create temp table tmp_libro_demo as
   select u.usuarioid, pp.parmonedaid,
-         q.cantidad, 0, q.cantidad,
-         q.precio, round(q.cantidad * q.precio, 8), 0,
-         'Activa', now(), now()
+         round(1000 * t_d.por_usd, 2) as cantidad,
+         round(pp.medio * 0.995, 8) as precio_compra,
+         round(pp.medio * 1.005, 8) as precio_venta
   from tmp_precio_par_demo pp
   join tmp_tasas_demo t_d on t_d.codigo = pp.destino
   join usuarios u on u.nombreusuario = 'mercado_demo'
-  cross join lateral (
-    select round(1000 * t_d.por_usd, 2) as cantidad, round(pp.medio * 0.995, 8) as precio
-  ) q
-  where 'USD' in (pp.origen, pp.destino)
-    and not exists (
-      select 1 from ordenescompra o
-      where o.usuarioid = u.usuarioid and o.parmonedaid = pp.parmonedaid);
+  where 'USD' in (pp.origen, pp.destino);
+
+  insert into ordenescompra
+    (usuarioid, parmonedaid, cantidadoriginal, cantidadobtenida, cantidadpendiente,
+     preciounitario, totalcomprometido, totalejecutado, estado, fechacreacion, fechaactualizacion)
+  select l.usuarioid, l.parmonedaid, l.cantidad, 0, l.cantidad, l.precio_compra,
+         round(l.cantidad * l.precio_compra, 8), 0, 'Activa', now(), now()
+  from tmp_libro_demo l
+  where not exists (select 1 from ordenescompra o
+                    where o.usuarioid = l.usuarioid and o.parmonedaid = l.parmonedaid);
 
   insert into ofertasventa
     (usuarioid, parmonedaid, cantidadoriginal, cantidadvendida, cantidadpendiente,
      preciounitario, totalesperado, totalrecibido, estado, fechacreacion, fechaactualizacion)
-  select u.usuarioid, pp.parmonedaid,
-         q.cantidad, 0, q.cantidad,
-         q.precio, round(q.cantidad * q.precio, 8), 0,
-         'Activa', now(), now()
-  from tmp_precio_par_demo pp
-  join tmp_tasas_demo t_d on t_d.codigo = pp.destino
-  join usuarios u on u.nombreusuario = 'mercado_demo'
-  cross join lateral (
-    select round(1000 * t_d.por_usd, 2) as cantidad, round(pp.medio * 1.005, 8) as precio
-  ) q
-  where 'USD' in (pp.origen, pp.destino)
-    and not exists (
-      select 1 from ofertasventa o
-      where o.usuarioid = u.usuarioid and o.parmonedaid = pp.parmonedaid);
+  select l.usuarioid, l.parmonedaid, l.cantidad, 0, l.cantidad, l.precio_venta,
+         round(l.cantidad * l.precio_venta, 8), 0, 'Activa', now(), now()
+  from tmp_libro_demo l
+  where not exists (select 1 from ofertasventa v
+                    where v.usuarioid = l.usuarioid and v.parmonedaid = l.parmonedaid);
 
   drop table if exists pg_temp.tmp_tasas_demo;
   drop table if exists pg_temp.tmp_precio_par_demo;
+  drop table if exists pg_temp.tmp_libro_demo;
 end $$;
 
 -- Resumen de lo cargado
